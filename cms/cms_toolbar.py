@@ -2,9 +2,10 @@
 import urllib
 from cms.toolbar.base import Toolbar
 from cms.toolbar.constants import LEFT, RIGHT
-from cms.toolbar.items import (Anchor, Switcher, TemplateHTML, ListItem, List, 
+from cms.toolbar.items import (Anchor, Switcher, TemplateHTML, ListItem, List,
     GetButton)
 from cms.utils import cms_static_url
+from cms.utils.conf import get_cms_setting
 from cms.utils.permissions import has_page_change_permission
 from django import forms
 from django.conf import settings
@@ -125,15 +126,6 @@ class CMSToolbar(Toolbar):
             current_page = self.request.current_page
 
             if current_page:
-                states = current_page.last_page_states()
-                has_states = bool(len(states))
-                self.page_states = states
-                if has_states:
-                    items.append(
-                        TemplateHTML(LEFT, 'status',
-                                     'cms/toolbar/items/status.html')
-                    )
-
                 # publish button
                 if edit_mode:
                     if current_page.has_publish_permission(self.request):
@@ -168,7 +160,7 @@ class CMSToolbar(Toolbar):
         menu_items = []
         page = self.request.current_page.get_draft_object()
         url = reverse('admin:cms_page_change_template', args=(page.pk,))
-        for path, name in settings.CMS_TEMPLATES:
+        for path, name in get_cms_setting('TEMPLATES'):
             args = urllib.urlencode({'template': path})
             css = 'template'
             if page.get_template() == path:
@@ -178,7 +170,7 @@ class CMSToolbar(Toolbar):
             )
         return List(RIGHT, 'templates', _('Template'),
                     '', items=menu_items)
-    
+
     def get_page_menu(self, context, can_change, is_staff):
         """
         Builds the 'page menu'
@@ -193,13 +185,13 @@ class CMSToolbar(Toolbar):
                      _get_add_child_url,
                      icon=cms_static_url('images/toolbar/icons/icon_child.png'))
         )
-        
+
         menu_items.append(
             ListItem('addsibling', _('Add sibling page'),
                      _get_add_sibling_url,
                      icon=cms_static_url('images/toolbar/icons/icon_sibling.png'))
         )
-            
+
         menu_items.append(
             ListItem('delete', _('Delete Page'), _get_delete_url,
                      icon=cms_static_url('images/toolbar/icons/icon_delete.png'))
@@ -207,7 +199,7 @@ class CMSToolbar(Toolbar):
         return List(RIGHT, 'page', _('Page'),
                     cms_static_url('images/toolbar/icons/icon_page.png'),
                     items=menu_items)
-    
+
     def get_admin_menu(self, context, can_change, is_staff):
         """
         Builds the 'admin menu' (the one with the cogwheel)

@@ -7,6 +7,7 @@ You must implement the necessary permission checks in your own code before
 calling these methods!
 """
 import datetime
+from cms.utils.conf import get_cms_setting
 from django.core.exceptions import PermissionDenied
 from cms.utils.i18n import get_language_list
 
@@ -124,10 +125,16 @@ def create_page(title, template, language, menu_title=None, slug=None,
         _thread_locals.user = None
     
     # validate template
-    assert template in [tpl[0] for tpl in settings.CMS_TEMPLATES]
-    
+    assert template in [tpl[0] for tpl in get_cms_setting('TEMPLATES')]
+
+    # validate site
+    if not site:
+        site = Site.objects.get_current()
+    else:
+        assert isinstance(site, Site)
+
     # validate language:
-    assert language in get_language_list()
+    assert language in get_language_list(site), get_cms_setting('LANGUAGES').get(site.pk)
     
     # set default slug:
     if not slug:
@@ -142,7 +149,7 @@ def create_page(title, template, language, menu_title=None, slug=None,
     # validate parent
     if parent:
         assert isinstance(parent, Page)
-    
+
     # validate publication date
     if publication_date:
         assert isinstance(publication_date, datetime.date)
@@ -152,14 +159,8 @@ def create_page(title, template, language, menu_title=None, slug=None,
         assert isinstance(publication_end_date, datetime.date)
         
     # validate softroot
-    assert settings.CMS_SOFTROOT or not soft_root
+    assert get_cms_setting('SOFTROOT') or not soft_root
     
-    # validate site
-    if not site:
-        site = Site.objects.get_current()
-    else:
-        assert isinstance(site, Site)
-        
     if navigation_extenders:
         raw_menus = menu_pool.get_menus_by_attribute("cms_enabled", True)
         menus = [menu[0] for menu in raw_menus]
@@ -221,12 +222,12 @@ def create_title(language, title, page, menu_title=None, slug=None,
     
     See docs/extending_cms/api_reference.rst for more info
     """
-    # validate language:
-    assert language in get_language_list()
-    
     # validate page
     assert isinstance(page, Page)
-    
+
+    # validate language:
+    assert language in get_language_list(page.site_id)
+
     # set default slug:
     if not slug:
         slug = _generate_valid_slug(title, parent, language)

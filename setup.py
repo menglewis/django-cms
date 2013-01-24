@@ -33,7 +33,7 @@ setup(
         'south>=0.7.2',
         'html5lib',
         'django-mptt>=0.5.1,<0.5.3',
-        'django-sekizai>=0.6.1',
+        'django-sekizai>=0.7',
     ],
     tests_require=[
         'django-reversion>=1.6',
@@ -41,7 +41,7 @@ setup(
         'Sphinx==1.1.3',
         'Jinja2==2.6',
         'Pygments==1.5',
-        
+        'dj-database-url==0.2.1',
     ],
     packages=find_packages(exclude=["project","project.*"]),
     include_package_data=True,

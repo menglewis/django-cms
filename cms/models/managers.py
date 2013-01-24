@@ -3,6 +3,7 @@ from cms.cache.permissions import get_permission_cache, set_permission_cache
 from cms.exceptions import NoPermissionsException
 from cms.models.query import PageQuerySet
 from cms.publisher import PublisherManager
+from cms.utils import get_cms_setting
 from cms.utils.i18n import get_fallback_languages
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -340,7 +341,7 @@ class PagePermissionManager(BasicPagePermissionManager):
         """
         # permissions should be managed on the draft page only
         page = page.get_draft_object()
-        from cms.models import ACCESS_DESCENDANTS, ACCESS_CHILDREN,\
+        from cms.models import ACCESS_DESCENDANTS, ACCESS_CHILDREN, \
             ACCESS_PAGE_AND_CHILDREN, ACCESS_PAGE_AND_DESCENDANTS
         # code taken from
         # https://github.com/divio/django-cms/issues/1113#issuecomment-3376790
@@ -450,7 +451,7 @@ class PagePermissionsPermissionManager(models.Manager):
         if attr != "can_view":
             if not user.is_authenticated() or not user.is_staff:
                 return []
-        if user.is_superuser or not settings.CMS_PERMISSION:
+        if user.is_superuser or not get_cms_setting('PERMISSION'):
             # got superuser, or permissions aren't enabled? just return grant
             # all mark
             return PagePermissionsPermissionManager.GRANT_ALL

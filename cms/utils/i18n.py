@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
 from cms.exceptions import LanguageError
+from cms.utils.conf import get_cms_setting
 from django.conf import settings
 from django.utils import translation
 from django.utils.translation import ugettext_lazy  as _
@@ -17,15 +18,15 @@ def force_language(new_lang):
 
 def get_languages(site_id=None):
     site_id = get_site(site_id)
-    result = settings.CMS_LANGUAGES.get(site_id)
+    result = get_cms_setting('LANGUAGES').get(site_id)
     if not result:
         result = []
-        defaults = settings.CMS_LANGUAGES.get('default', {})
+        defaults = get_cms_setting('LANGUAGES').get('default', {})
         for code, name in settings.LANGUAGES:
             lang = {'code': code, 'name': _(name)}
             lang.update(defaults)
             result.append(lang)
-        settings.CMS_LANGUAGES[site_id] = result
+        get_cms_setting('LANGUAGES')[site_id] = result
     return result
 
 
@@ -75,7 +76,7 @@ def get_public_languages(site_id=None):
     """
     languages = []
     for language in get_language_objects(site_id):
-        if language["public"]:
+        if language.get("public", True):
             languages.append(language['code'])
     return languages
 
@@ -98,10 +99,10 @@ def get_language_objects(site_id=None):
     return list(get_languages(site_id))
 
 
-def get_default_language(language_code=None):
+def get_default_language(language_code=None, site_id=None):
     """
     Returns default language depending on settings.LANGUAGE_CODE merged with
-    best match from settings.CMS_LANGUAGES
+    best match from get_cms_setting('LANGUAGES')
 
     Returns: language_code
     """
@@ -109,7 +110,7 @@ def get_default_language(language_code=None):
     if not language_code:
         language_code = settings.LANGUAGE_CODE
 
-    languages = get_language_list()
+    languages = get_language_list(site_id)
 
     # first try if there is an exact language
     if language_code in languages:

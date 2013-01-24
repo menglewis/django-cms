@@ -2,6 +2,7 @@
 from cms.exceptions import NoPermissionsException
 from cms.models import Page, PagePermission, GlobalPagePermission
 from cms.plugin_pool import plugin_pool
+from cms.utils import get_cms_setting
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.sites.models import Site
@@ -23,8 +24,8 @@ def set_current_user(user):
     Assigns current user from request to thread_locals, used by
     CurrentUserMiddleware.
     """
-    _thread_locals.user=user
-    
+    _thread_locals.user = user
+
 def get_current_user():
     """
     Returns current user, or None
@@ -44,11 +45,11 @@ def has_page_add_permission(request):
     opts = Page._meta
     if request.user.is_superuser:
         return True
-    
+
     # if add under page
     target = request.GET.get('target', None)
     position = request.GET.get('position', None)
-    
+
     if target is not None:
         try:
             page = Page.objects.get(pk=target)
@@ -93,7 +94,7 @@ def has_page_change_permission(request):
     return request.user.is_superuser or (
         request.user.has_perm(opts.app_label + '.' + opts.get_change_permission())
         and (
-            not settings.CMS_PERMISSION or
+            not get_cms_setting('PERMISSION') or
             has_global_page_permission(request, current_site(request),
                                        can_change=True) or
             has_any_page_change_permissions(request)))
@@ -110,6 +111,8 @@ def has_global_page_permission(request, site=None, **filters):
     :param filters: queryset filters, e.g. ``can_add = True``
     :return: ``True`` or ``False``
     """
+    if request.user.is_superuser:
+        return True
     if not hasattr(request, '_cms_global_perms'):
         request._cms_global_perms = {}
     key = tuple((k, v) for k, v in filters.iteritems())
@@ -118,7 +121,7 @@ def has_global_page_permission(request, site=None, **filters):
     if key not in request._cms_global_perms:
         qs = GlobalPagePermission.objects.with_user(request.user).filter(**filters)
         if site:
-            qs = qs.filter(sites__in=[site])
+            qs = qs.filter(Q(sites__in=[site]) | Q(sites__isnull=True))
         request._cms_global_perms[key] = qs.exists()
     return request._cms_global_perms[key]
 
@@ -190,12 +193,12 @@ def get_subordinate_users(user):
         Will return [user, C, X, D, Y, Z]. W was created by user, but is also
         assigned to higher level.
     """
-    
+
     # TODO: try to merge with PagePermissionManager.subordinate_to_user()
-    
+
     if user.is_superuser or \
             GlobalPagePermission.objects.with_can_change_permissions(user):
-        return User.objects.all() 
+        return User.objects.all()
     site = Site.objects.get_current()
     page_id_allow_list = Page.permissions.get_change_permissions_id_list(user, site)
     try:
@@ -203,16 +206,16 @@ def get_subordinate_users(user):
     except NoPermissionsException:
         # no permission so only staff and no page permissions 
         qs = User.objects.distinct().filter(
-                Q(is_staff=True) & 
-                Q(pageuser__created_by=user) & 
+                Q(is_staff=True) &
+                Q(pageuser__created_by=user) &
                 Q(pagepermission__page=None)
         )
         qs = qs.exclude(pk=user.id).exclude(groups__user__pk=user.id)
         return qs
     # normal query
     qs = User.objects.distinct().filter(
-        Q(is_staff=True) & 
-        (Q(pagepermission__page__id__in=page_id_allow_list) & Q(pagepermission__page__level__gte=user_level)) 
+        Q(is_staff=True) &
+        (Q(pagepermission__page__id__in=page_id_allow_list) & Q(pagepermission__page__level__gte=user_level))
         | (Q(pageuser__created_by=user) & Q(pagepermission__page=None))
     )
     qs = qs.exclude(pk=user.id).exclude(groups__user__pk=user.id)
@@ -234,13 +237,13 @@ def get_subordinate_groups(user):
         # no permission no records
         # page_id_allow_list is empty
         qs = Group.objects.distinct().filter(
-         Q(pageusergroup__created_by=user) & 
+         Q(pageusergroup__created_by=user) &
          Q(pagepermission__page=None)
         )
         return qs
-    
+
     qs = Group.objects.distinct().filter(
-         (Q(pagepermission__page__id__in=page_id_allow_list) & Q(pagepermission__page__level__gte=user_level)) 
+         (Q(pagepermission__page__id__in=page_id_allow_list) & Q(pagepermission__page__level__gte=user_level))
         | (Q(pageusergroup__created_by=user) & Q(pagepermission__page=None))
     )
     return qs
@@ -273,14 +276,14 @@ def get_user_sites_queryset(user):
     3.  For standard user returns just sites he is assigned to over pages.
     """
     qs = Site.objects.all()
-    
+
     if user.is_superuser:
         return qs
-    
+
     global_ids = GlobalPagePermission.objects.with_user(user).filter(
         Q(can_add=True) | Q(can_change=True)
     ).values_list('id', flat=True)
-    
+
     query = Q()
     if global_ids:
         query = Q(globalpagepermission__id__in=global_ids)
